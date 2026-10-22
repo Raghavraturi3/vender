@@ -6,13 +6,20 @@ import { Product } from './models/Product.js';
 import { InventoryMovement } from './models/InventoryMovement.js';
 import { lookupProductImage } from './services/imageLookupService.js';
 
-const seedDatabase = async () => {
+export const seedDatabase = async () => {
   try {
     console.log('[Seed] Connecting to MongoDB...');
-    await mongoose.connect(ENV.MONGODB_URI);
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(ENV.MONGODB_URI);
+    }
     console.log('[Seed] Connected.');
 
-    // Clear existing data for clean seed
+    const userCount = await User.countDocuments();
+    if (userCount > 0) {
+      console.log('[Seed] Database already populated; skipping seed.');
+      return;
+    }
+
     console.log('[Seed] Cleaning old collections...');
     await Promise.all([
       User.deleteMany({}),
@@ -133,7 +140,6 @@ const seedDatabase = async () => {
     const createdStores = await Store.create(storesData);
     const storeMap = new Map(createdStores.map((s) => [s.slug, s]));
 
-    // 2. Create Users (Admin, 5 Sellers, 1 Student)
     console.log('[Seed] Creating Users...');
     const admin = await User.create({
       name: 'Campus Administrator',
@@ -212,7 +218,6 @@ const seedDatabase = async () => {
       status: 'active'
     });
 
-    // Update store owners
     await Store.updateOne({ slug: 'college-canteen' }, { ownerId: canteenSeller._id });
     await Store.updateOne({ slug: 'durga-fast-food' }, { ownerId: durgaSeller._id });
     await Store.updateOne({ slug: 'monal-fast-food' }, { ownerId: monalSeller._id });
@@ -979,13 +984,19 @@ const seedDatabase = async () => {
     console.log('Bhandari:    bhandari@vendersetu.edu.in  / Seller@123');
     console.log('Devbhoomi:   devbhoomi@vendersetu.edu.in / Seller@123');
     console.log('---------------------------------------------------------');
-
-    await mongoose.disconnect();
-    process.exit(0);
   } catch (error) {
     console.error('[Seed Error]', error);
-    process.exit(1);
+    throw error;
   }
 };
 
-seedDatabase();
+const isDirectSeedExecution = (() => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const normalized = entry.replace(/\\/g, '/');
+  return normalized.endsWith('/seed.ts') || normalized.endsWith('/seed.js') || normalized.endsWith('/dist/seed.js');
+})();
+
+if (isDirectSeedExecution) {
+  void seedDatabase();
+}

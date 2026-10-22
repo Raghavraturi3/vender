@@ -83,7 +83,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Static uploads directory serving with security headers
-const uploadsDirectory = path.resolve(__dirname, '../public/uploads');
+const uploadsDirectory = path.resolve('public/uploads');
 app.use(
   '/uploads',
   express.static(uploadsDirectory, {

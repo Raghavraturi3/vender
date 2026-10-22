@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { app } from '../src/index.js';
+import { seedDatabase } from '../src/seed.js';
 import { User } from '../src/models/User.js';
 import { Store } from '../src/models/Store.js';
 import { Product } from '../src/models/Product.js';
@@ -15,12 +17,19 @@ describe('VenderSetu API & Business Logic Integration Tests', () => {
   let canteenStoreId: string;
   let durgaStoreId: string;
   let testProductId: string;
+  let memoryServer: MongoMemoryServer | null = null;
 
   beforeAll(async () => {
-    // Wait for DB connection
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/vendersetu');
+    const mongoUri = process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+      memoryServer = await MongoMemoryServer.create();
+      await mongoose.connect(memoryServer.getUri());
+    } else if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(mongoUri);
     }
+
+    await seedDatabase();
 
     // Login Student
     const studentRes = await request(app)
@@ -47,10 +56,13 @@ describe('VenderSetu API & Business Logic Integration Tests', () => {
       .post('/api/auth/login')
       .send({ email: 'admin@vendersetu.edu.in', password: 'Admin@123' });
     adminToken = adminRes.body.token;
-  });
+  }, 60000);
 
   afterAll(async () => {
-    // Keep DB open or clean up
+    await mongoose.disconnect();
+    if (memoryServer) {
+      await memoryServer.stop();
+    }
   });
 
   it('1. Verifies all 5 onboarded stores appear in the marketplace', async () => {

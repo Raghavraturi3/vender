@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ENV } from './env.js';
+import { seedDatabase } from '../seed.js';
 
 let cachedPromise: Promise<typeof mongoose> | null = null;
 
@@ -9,8 +10,11 @@ export const connectDB = async (): Promise<void> => {
   }
 
   if (!cachedPromise) {
-    cachedPromise = mongoose.connect(ENV.MONGODB_URI).then((conn) => {
+    cachedPromise = mongoose.connect(ENV.MONGODB_URI).then(async (conn) => {
       console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+      if (process.env.NODE_ENV === 'test' || process.env.SEED_ON_START === 'true') {
+        await seedDatabase();
+      }
       return conn;
     }).catch((error) => {
       cachedPromise = null;
